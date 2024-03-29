@@ -140,7 +140,7 @@
         !Workaround for ifort, gives class pointer to avoid creating temps and huge slow down
         class(TThermoData), pointer :: ThermoData => null()
 
-        real(dl), pointer :: OutputTransfer(:) => null()
+        real, pointer :: OutputTransfer(:) => null()
         real(dl), pointer :: OutputSources(:) => null()
         real(dl), pointer :: CustomSources(:) => null()
         integer :: OutputStep = 0
@@ -2123,7 +2123,7 @@
     implicit none
     type(EvolutionVars) EV
     real(dl), intent(in) :: tau
-    real(dl), target :: Arr(:)
+    real, target :: Arr(:)
     real(dl) y(EV%nvar),yprime(EV%nvar)
 
     yprime = 0
@@ -2133,29 +2133,7 @@
     Arr(Transfer_kh+1:Transfer_max) = Arr(Transfer_kh+1:Transfer_max)/EV%k2_buf
 
     end subroutine outtransf
-    subroutine outtransftest(EV, y,tau, Arr)
-        use Transfer
-        implicit none
-        type(EvolutionVars) EV
-        real(dl), intent(in) :: tau
-        real(dl), target :: Arr(:)
-        real(dl) y(EV%nvar),yprime(EV%nvar)
 
-        yprime = 0
-        EV%OutputTransfer =>  Arr
-        call derivs(EV,EV%ScalEqsToPropagate,tau,y,yprime)
-        nullify(EV%OutputTransfer)
-
-      !  Arr(Transfer_weyl) = Arr(Transfer_Weyl)/EV%k2_buf
-     !   Arr(Transfer_psi) = Arr(Transfer_psi)/EV%k2_buf
-     !   Arr(Transfer_phi) = Arr(Transfer_phi)/EV%k2_buf
-
-
-
-        Arr(Transfer_kh+1:Transfer_max) = Arr(Transfer_kh+1:Transfer_max)
-
-
-    end subroutine outtransftest
     subroutine derivs(EV,n,tau,ay,ayprime)
     !  Evaluate the time derivatives of the scalar perturbations
     use constants, only : barssc0, Compton_CT, line21_const

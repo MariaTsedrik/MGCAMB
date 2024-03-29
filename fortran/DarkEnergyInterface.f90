@@ -280,7 +280,6 @@
     this%is_cosmological_constant = .not. this%use_tabulated_w .and. &
         &  abs(this%w_lam + 1._dl) < 1.e-6_dl .and. this%wa==0._dl
 
-
     end subroutine TDarkEnergyEqnOfState_Init
 
 

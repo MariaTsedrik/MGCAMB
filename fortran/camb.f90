@@ -32,7 +32,7 @@
             Cdata%OnlyTransfer = .true. !prevent ClTransferToCl
             Cdata%CP%WantTensors = .false.
             CData%CP%WantVectors = .false.
-            call TimeSourcesToCl
+            call TimeSourcesToCl(CData%ClData%CTransScal)
             Cdata%CP%WantTensors = want_tensors
             CData%CP%WantVectors = want_vectors
             Cdata%OnlyTransfer = .false.
@@ -189,7 +189,7 @@
     end subroutine CAMB_GetCls
 
     function CAMB_GetAge(P)
-    !Return age in gigayears, returns -1 on error
+    !Return age in Julian gigayears, returns -1 on error
     type(CAMBparams), intent(in) :: P
     real(dl) CAMB_GetAge
     integer error
@@ -411,10 +411,6 @@
     endif
 
     !  Read initial parameters.
-    !> MGCAMB MOD START: reading models and params
-    call MGCAMB_read_model_params( mgcamb_par_cache, Ini )
-    !< MGCAMB MOD END
-
     DarkEneryModel = UpperCase(Ini%Read_String_Default('dark_energy_model', 'fluid'))
     if (allocated(P%DarkEnergy)) deallocate(P%DarkEnergy)
 	!> MGCAMB MOD START
@@ -455,6 +451,10 @@
     mgcamb_par_cache%h0     = P%H0
     mgcamb_par_cache%h0_Mpc = P%H0 * (1.d3/c)
     mgcamb_par_cache%output_root = outroot
+    !< MGCAMB MOD END
+
+    !> MGCAMB MOD START: reading models and params
+    call MGCAMB_read_model_params( mgcamb_par_cache, Ini )
     !< MGCAMB MOD END
 
 

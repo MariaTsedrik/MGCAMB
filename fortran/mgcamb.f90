@@ -1,5 +1,6 @@
 module MGCAMB
     use precision
+    use splines
 
     ! new model selection flags
     integer :: MG_flag
@@ -39,6 +40,8 @@ module MGCAMB
 
     ! Growth rate gamma
     real(dl) :: Linder_gamma
+    real(dl) :: Linder_gamma_0
+    real(dl) :: Linder_gamma_1
 
     ! Symmetron
     real(dl) :: beta_star
@@ -72,7 +75,7 @@ module MGCAMB
 	logical :: MGDE_const = .True.
     logical :: MGDE_pert = .False.
 
-    character(len=(10)) :: MGCAMB_version = 'v 4.0'
+    !character(len=(10)) :: MGCAMB_version = 'v 4.0'
 
 
 ! =============MGXrecon=============
@@ -187,6 +190,8 @@ contains
 	subroutine reconstruction_arr
 
 		use precision
+        !use Interpolation
+        !use splines
 		implicit none
 
 		integer :: i
@@ -207,17 +212,29 @@ contains
 			end if
 		  end do
 
-		  call spline(a_arr,mu_arr,2*nnode,d0lo,d0hi,ddmu_arr)
+		!   call spline(a_arr,mu_arr,2*nnode,d0lo,d0hi,ddmu_arr)
+		!   call spline_deriv(a_arr,mu_arr,ddmu_arr,dmu_arr,2*nnode)
+		!   call spline(a_arr,dmu_arr,2*nnode,d0lo,d0hi,dddmu_arr)
+		  
+		!   call spline(a_arr,gamma_arr,2*nnode,d0lo,d0hi,ddgamma_arr)
+		!   call spline_deriv(a_arr,gamma_arr,ddgamma_arr,dgamma_arr,2*nnode)
+		!   call spline(a_arr,dgamma_arr,2*nnode,d0lo,d0hi,dddgamma_arr)
+		  
+		!   call spline(a_arr,X_arr,2*nnode,d0lo,d0hi,ddX_arr)
+		!   call spline_deriv(a_arr,X_arr,ddX_arr,dX_arr,2*nnode)
+		!   call spline(a_arr,dX_arr,2*nnode,d0lo,d0hi,dddX_arr)	  
+
+		  call spline_def(a_arr,mu_arr,2*nnode,ddmu_arr)
 		  call spline_deriv(a_arr,mu_arr,ddmu_arr,dmu_arr,2*nnode)
-		  call spline(a_arr,dmu_arr,2*nnode,d0lo,d0hi,dddmu_arr)
+		  call spline_def(a_arr,dmu_arr,2*nnode,dddmu_arr)
 		  
-		  call spline(a_arr,gamma_arr,2*nnode,d0lo,d0hi,ddgamma_arr)
+		  call spline_def(a_arr,gamma_arr,2*nnode,ddgamma_arr)
 		  call spline_deriv(a_arr,gamma_arr,ddgamma_arr,dgamma_arr,2*nnode)
-		  call spline(a_arr,dgamma_arr,2*nnode,d0lo,d0hi,dddgamma_arr)
+		  call spline_def(a_arr,dgamma_arr,2*nnode,dddgamma_arr)
 		  
-		  call spline(a_arr,X_arr,2*nnode,d0lo,d0hi,ddX_arr)
+		  call spline_def(a_arr,X_arr,2*nnode,ddX_arr)
 		  call spline_deriv(a_arr,X_arr,ddX_arr,dX_arr,2*nnode)
-		  call spline(a_arr,dX_arr,2*nnode,d0lo,d0hi,dddX_arr)	  
+		  call spline_def(a_arr,dX_arr,2*nnode,dddX_arr)
 
 
 	end subroutine reconstruction_arr
@@ -700,7 +717,7 @@ contains
         real(dl) :: LKA1 ! \lambda_1^2 k^2 a^s
         real(dl) :: LKA2 ! \lambda_1^2 k^2 a^s
         real(dl) :: t1, t2, t1dot, t2dot
-        real(dl) :: omm, ommdot
+        real(dl) :: omm, ommdot, Linder_gamma_a
 
         real(dl) :: omegaDE_t
 
@@ -765,8 +782,25 @@ contains
                 MGCAMB_Mu=2._dl/3._dl*omm**(Linder_gamma-1._dl)*&
                 (omm**Linder_gamma+2-3._dl*Linder_gamma+3._dl*(Linder_gamma-0.5d0)*omm)
 
-            else if ( alt_MG_flag == 2 ) then
-                MGCAMB_Mu = 1._dl
+            else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
+                omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                & + (1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                & /(mg_par_cache%omegab+mg_par_cache%omegac)
+                Linder_gamma_a=Linder_gamma_0+Linder_gamma_1*(a+1._dl/a-2) 
+
+                MGCAMB_Mu=2._dl/3._dl*omm**(Linder_gamma_a-1._dl)*&
+                (omm**Linder_gamma_a+2-3._dl*Linder_gamma_a+3._dl*(Linder_gamma_a-0.5d0)*omm+Linder_gamma_1*(a-1._dl/a)*LOG(omm))
+ 
+            else if (alt_MG_flag == 3) then !(Linder Gamma Sigma1)
+                omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                & + (1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                & /(mg_par_cache%omegab+mg_par_cache%omegac)
+
+                MGCAMB_Mu=2._dl/3._dl*omm**(Linder_gamma-1._dl)*&
+                (omm**Linder_gamma+2-3._dl*Linder_gamma+3._dl*(Linder_gamma-0.5d0)*omm)
+
             end if
 
 
@@ -855,8 +889,25 @@ contains
                     MGCAMB_Mu=2._dl/3._dl*omm**(Linder_gamma-1._dl)*&
                     (omm**Linder_gamma+2-3._dl*Linder_gamma+3._dl*(Linder_gamma-0.5d0)*omm)
                 
-                else if ( alt_MG_flag == 2 ) then
-                    MGCAMB_Mu = 1._dl
+                else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
+                    omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                    & + (1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                    ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                    & /(mg_par_cache%omegab+mg_par_cache%omegac)
+                    Linder_gamma_a=Linder_gamma_0+Linder_gamma_1*(a+1._dl/a-2) 
+
+                    MGCAMB_Mu=2._dl/3._dl*omm**(Linder_gamma_a-1._dl)*&
+                    (omm**Linder_gamma_a+2-3._dl*Linder_gamma_a+3._dl*(Linder_gamma_a-0.5d0)*omm+Linder_gamma_1*(a-1._dl/a)*LOG(omm))
+                
+                else if (alt_MG_flag == 3) then !(Linder Gamma Sigma1)
+                    omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                    & + (1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                    ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                    & /(mg_par_cache%omegab+mg_par_cache%omegac)
+
+                    MGCAMB_Mu=2._dl/3._dl*omm**(Linder_gamma-1._dl)*&
+                    (omm**Linder_gamma+2-3._dl*Linder_gamma+3._dl*(Linder_gamma-0.5d0)*omm)
+                
                 end if
             
             else if(muSigma_flag == 3) then  ! all-matter QSA models
@@ -917,7 +968,7 @@ contains
         real(dl) :: LKA1 ! \lambda_1^2 k^2 a^s
         real(dl) :: LKA2 ! \lambda_1^2 k^2 a^s
         real(dl) :: t1,t2,t1dot,t2dot
-        real(dl) :: omm, ommdot
+        real(dl) :: omm, ommdot, Linder_gamma_a, Linder_gamma_a_dot
 
 
         ! mapping beta,m into mu,gamma
@@ -988,8 +1039,34 @@ contains
                     2._dl/3._dl*omm**(Linder_gamma-1._dl)*ommdot*&
                     (Linder_gamma*omm**(Linder_gamma-1._dl)+3._dl*(Linder_gamma-0.5d0))
 
-            else if ( alt_MG_flag == 2 ) then
-                MGCAMB_Mudot = 0._dl
+            else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
+                mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+
+                omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                    & +(1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                    & /(mg_par_cache%omegab+mg_par_cache%omegac)
+                Linder_gamma_a=Linder_gamma_0+Linder_gamma_1*(a+1._dl/a-2)   
+                Linder_gamma_a_dot=Linder_gamma_1*(a**2-1._dl)/a*mg_cache%adotoa   
+
+                MGCAMB_Mudot = mu/omm*(Linder_gamma_a-1._dl)*ommdot+&
+                    mu*LOG(omm)*Linder_gamma_a_dot+&
+                    2._dl/3._dl*omm**(Linder_gamma_a-1._dl)*ommdot*&
+                    (Linder_gamma_a*omm**(Linder_gamma_a-1._dl)+3._dl*(Linder_gamma_a-0.5d0)+Linder_gamma_1*(a-1._dl/a)/omm)+&
+                    2._dl/3._dl*omm**(Linder_gamma_a-1._dl)*(Linder_gamma_a_dot*(omm**Linder_gamma_a*LOG(omm)-3+3._dl*omm)+Linder_gamma_1*LOG(omm)*(a**2+1._dl)/a*mg_cache%adotoa)
+               
+            else if (alt_MG_flag == 3) then !(Linder Gamma Sigma1)
+                mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+
+                omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                    & +(1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                    & /(mg_par_cache%omegab+mg_par_cache%omegac)
+
+                MGCAMB_Mudot = mu/omm*(Linder_gamma-1._dl)*ommdot+&
+                    2._dl/3._dl*omm**(Linder_gamma-1._dl)*ommdot*&
+                    (Linder_gamma*omm**(Linder_gamma-1._dl)+3._dl*(Linder_gamma-0.5d0))
+            
             end if
 
 
@@ -1091,8 +1168,34 @@ contains
                         2._dl/3._dl*omm**(Linder_gamma-1._dl)*ommdot*&
                         (Linder_gamma*omm**(Linder_gamma-1._dl)+3._dl*(Linder_gamma-0.5d0))
 
-                else if ( alt_MG_flag == 2 ) then
-                    MGCAMB_Mudot = 0._dl
+                else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
+                    mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+
+                    omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                        & +(1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                    ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                        & /(mg_par_cache%omegab+mg_par_cache%omegac)
+                    Linder_gamma_a=Linder_gamma_0+Linder_gamma_1*(a+1._dl/a-2)   
+                    Linder_gamma_a_dot=Linder_gamma_1*(a**2-1._dl)/a*mg_cache%adotoa  
+
+                    MGCAMB_Mudot = mu/omm*(Linder_gamma_a-1._dl)*ommdot+&
+                    mu*LOG(omm)*Linder_gamma_a_dot+&
+                    2._dl/3._dl*omm**(Linder_gamma_a-1._dl)*ommdot*&
+                    (Linder_gamma_a*omm**(Linder_gamma_a-1._dl)+3._dl*(Linder_gamma_a-0.5d0)+Linder_gamma_1*(a-1._dl/a)/omm)+&
+                    2._dl/3._dl*omm**(Linder_gamma_a-1._dl)*(Linder_gamma_a_dot*(omm**Linder_gamma_a*LOG(omm)-3+3._dl*omm)+Linder_gamma_1*LOG(omm)*(a**2+1._dl)/a*mg_cache%adotoa)
+               
+                else if (alt_MG_flag == 3) then !(Linder Gamma Sigma1)
+                    mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+
+                    omm=(mg_par_cache%omegab+mg_par_cache%omegac)/((mg_par_cache%omegab+mg_par_cache%omegac) &
+                        & +(1-mg_par_cache%omegab-mg_par_cache%omegac)*a**3)
+                    ommdot=-3._dl*omm**2*a**3*mg_cache%adotoa*(1-mg_par_cache%omegab-mg_par_cache%omegac) &
+                        & /(mg_par_cache%omegab+mg_par_cache%omegac)
+
+                    MGCAMB_Mudot = mu/omm*(Linder_gamma-1._dl)*ommdot+&
+                        2._dl/3._dl*omm**(Linder_gamma-1._dl)*ommdot*&
+                        (Linder_gamma*omm**(Linder_gamma-1._dl)+3._dl*(Linder_gamma-0.5d0))               
+               
                 end if 
 
             else if(muSigma_flag == 3) then  ! all-matter QSA models
@@ -1156,7 +1259,7 @@ contains
         real(dl) :: t1,t2, t1dot, t2dot
 
         real(dl) :: beta, m
-        real(dl) :: omegaDE_t
+        real(dl) :: omegaDE_t, mu
 
         real(dl) :: sigma_t 
         real(dl) :: mu_t
@@ -1207,8 +1310,12 @@ contains
             if (alt_MG_flag == 1) then !(Linder Gamma)
                 MGCAMB_Gamma = 1._dl
 
-            else if ( alt_MG_flag == 2 ) then
+            else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
                 MGCAMB_Gamma = 1._dl
+
+            else if ( alt_MG_flag == 3 ) then !(Linder Gamma Sigma1)
+                mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+                MGCAMB_Gamma = 2._dl/mu -1._dl    
             end if
 
 
@@ -1285,8 +1392,13 @@ contains
                 if (alt_MG_flag == 1) then !(Linder Gamma)
                     MGCAMB_Gamma = 1._dl
 
-                else if ( alt_MG_flag == 2 ) then
+                else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
                     MGCAMB_Gamma = 1._dl
+
+                else if ( alt_MG_flag == 3 ) then !(Linder Gamma Sigma1)
+                    mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+                    MGCAMB_Gamma = 2._dl/mu -1._dl   
+
                 end if  
 
             else if(muSigma_flag == 3) then
@@ -1349,7 +1461,7 @@ contains
         real(dl) :: beta, betadot, m, mdot
         real(dl) :: omegaDE_t, omegaDEdot
         real(dl) :: sigma_t, sigmadot_t  
-        real(dl) :: mu_t, mudot_t
+        real(dl) :: mu_t, mudot_t, mu, mu_dot
 
 
 
@@ -1407,8 +1519,14 @@ contains
             if (alt_MG_flag == 1) then !(Linder Gamma)
                 MGCAMB_Gammadot = 0._dl
 
-            else if ( alt_MG_flag == 2 ) then
+            else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
                 MGCAMB_Gammadot = 0._dl
+
+            else if ( alt_MG_flag == 3 ) then !(Linder Gamma Sigma1)
+                mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+                mu_dot = MGCAMB_Mudot( a, mg_par_cache, mg_cache )
+
+                MGCAMB_Gammadot = -2._dl*mu_dot/mu**2   
             end if
 
 
@@ -1495,8 +1613,14 @@ contains
                 if (alt_MG_flag == 1) then !(Linder Gamma)
                     MGCAMB_Gammadot = 0._dl
 
-                else if ( alt_MG_flag == 2 ) then
+                else if ( alt_MG_flag == 2 ) then !(Linder Gamma z-dependent)
                     MGCAMB_Gammadot = 0._dl
+
+                else if ( alt_MG_flag == 3 ) then !(Linder Gamma Sigma1)
+                    mu = MGCAMB_Mu( a, mg_par_cache, mg_cache )
+                    mu_dot = MGCAMB_Mudot( a, mg_par_cache, mg_cache )
+
+                    MGCAMB_Gammadot = -2._dl*mu_dot/mu**2    
                 end if
             
             else if(muSigma_flag == 3) then 
@@ -2028,6 +2152,8 @@ contains
 
         ! Growth rate gamma
         Linder_gamma = CP%Linder_gamma
+        Linder_gamma_0 = CP%Linder_gamma_0
+        Linder_gamma_1 = CP%Linder_gamma_1
 
         ! Symmetron
         beta_star = CP%beta_star
@@ -2338,8 +2464,12 @@ contains
                     write(*,*) '    MGCAMB: Linder Gamma'
                     Linder_gamma = Ini%Read_Double('Linder_gamma', 0._dl)
                 else if ( alt_MG_flag == 2 ) then
-                    write(*,*) 'Please write your alternative MG model in mgcamb.f90'
-                    stop
+                    write(*,*) '    MGCAMB: Linder Gamma z-dependent'
+                    Linder_gamma_0 = Ini%Read_Double('Linder_gamma_0', 0._dl)
+                    Linder_gamma_1 = Ini%Read_Double('Linder_gamma_1', 0._dl)
+                else if ( alt_MG_flag == 3 ) then
+                    write(*,*) '    MGCAMB: Linder Gamma Sigma1'
+                    Linder_gamma = Ini%Read_Double('Linder_gamma', 0._dl)    
                 else
                     write(*,*) 'Please choose a model in params_MG.ini'
                     stop
@@ -2544,8 +2674,12 @@ contains
                         write(*,*) '    MGCAMB: Linder Gamma'
                         Linder_gamma = Ini%Read_Double('Linder_gamma', 0._dl)
                     else if ( alt_MG_flag == 2 ) then
-                        write(*,*) 'Please write your alternative MG model in mgcamb.f90'
-                        stop
+                        write(*,*) '    MGCAMB: Linder Gamma z-dependent'
+                        Linder_gamma_0 = Ini%Read_Double('Linder_gamma_0', 0._dl)
+                        Linder_gamma_1 = Ini%Read_Double('Linder_gamma_1', 0._dl)
+                    else if ( alt_MG_flag == 3 ) then
+                        write(*,*) '    MGCAMB: Linder Gamma Sigma1'
+                        Linder_gamma = Ini%Read_Double('Linder_gamma', 0._dl)       
                     else
                         write(*,*) 'Please choose a model in params_MG.ini'
                         stop
@@ -2693,7 +2827,7 @@ contains
         write(*,'(a)') "     __  _________  ________   __  ______  "
         write(*,'(a)') "    /  \/  / ____/ / ___/ _ | /  |/  / _ ) "
         write(*,'(a)') "   / /\_/ / /_,-, / /__/ __ |/ /|_/ / _  | "
-        write(*,'(a)') "  /_/  /_/_____/  \___/_/ |_/_/  /_/____/  "//" "//MGCAMB_version
+        write(*,'(a)') "  /_/  /_/_____/  \___/_/ |_/_/  /_/____/  "
         write(*,'(a)') "  "
         write(*,'(a)') "        Modified Growth with CAMB "
         write(*,'(a)') "  "

@@ -81,18 +81,18 @@
 
     call this%TDarkEnergyEqnOfState%Init(State)
 	if(MG_flag==0) then
-		if (this%is_cosmological_constant) then
-			this%num_perturb_equations = 0
-		else
-			if (this%use_tabulated_w) then
-				if (any(this%equation_of_state%F<-1)) &
-					error stop 'Fluid dark energy model does not allow w crossing -1'
-			elseif (this%wa/=0 .and. &
-				((1+this%w_lam < -1.e-6_dl) .or. 1+this%w_lam + this%wa < -1.e-6_dl)) then
-				error stop 'Fluid dark energy model does not allow w crossing -1'
-			end if
-			this%num_perturb_equations = 2
-		end if
+        if (this%is_cosmological_constant) then
+            this%num_perturb_equations = 0
+        else
+            if (this%use_tabulated_w) then
+                if (any(this%equation_of_state%F<-1)) &
+                    error stop 'Fluid dark energy model does not allow w crossing -1'
+            elseif (this%wa/=0 .and. &
+                ((1+this%w_lam < -1.e-6_dl) .or. 1+this%w_lam + this%wa < -1.e-6_dl)) then
+                error stop 'Fluid dark energy model does not allow w crossing -1'
+            end if
+            this%num_perturb_equations = 2
+        end if
 	else
 		if (MGDE_const) then
 			this%num_perturb_equations = 0
@@ -119,7 +119,6 @@
         dgrhoe = ay(w_ix) * grhov_t
         dgqe = ay(w_ix + 1) * grhov_t * (1 + w)
     end if
-!if(abs(a-1.d0)<1.d-5) write(*,*) 'PERTURB', dgrhoe, dgqe
     end subroutine TDarkEnergyFluid_PerturbedStressEnergy
 
 
@@ -151,7 +150,6 @@
     else
         ayprime(w_ix + 1) = 0
     end if
-!if(abs(a-1.d0)<1.d-5) write(*,*) 'EVOLVE'
 
     end subroutine TDarkEnergyFluid_PerturbationEvolve
 
@@ -213,7 +211,7 @@
             !get (very) approximate result for sound speed parameter; arXiv:1806.10608  Eq 30 (but mu may not exactly agree with what they used)
             n = nint((1+this%w_n)/(1-this%w_n))
             !Assume radiation domination, standard neutrino model; H0 factors cancel
-            grho_rad = (kappa/c**2*4*sigma_boltz/c**3*State%CP%tcmb**4*Mpc**2*(1+3.046*7._dl/8*(4._dl/11)**(4._dl/3)))
+            grho_rad = (kappa/c**2*4*sigma_boltz/c**3*State%CP%tcmb**4*Mpc**2*(1+default_nnu*7._dl/8*(4._dl/11)**(4._dl/3)))
             xc = this%a_c**2/2/sqrt(grho_rad/3)
             F=7./8
             p=1./2
